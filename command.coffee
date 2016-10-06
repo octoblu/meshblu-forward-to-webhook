@@ -1,13 +1,15 @@
 colors        = require 'colors'
 dashdash      = require 'dashdash'
+MeshbluConfig = require 'meshblu-config'
+MeshbluHttp   = require 'meshblu-http'
 
 packageJSON = require './package.json'
 
 OPTIONS = [{
-  names: ['example', 'e']
+  names: ['emitter-uuid', 'e']
   type: 'string'
-  env: 'EXAMPLE'
-  help: 'example argument'
+  env: 'MESHBLU_EMITTER_UUID'
+  help: 'Meshblu UUID of the device you wish to spy on.'
 }, {
   names: ['help', 'h']
   type: 'bool'
@@ -21,29 +23,45 @@ OPTIONS = [{
 class Command
   constructor: ->
     process.on 'uncaughtException', @die
-    {@example} = @parseOptions()
+    {@emitterUuid} = @parseOptions()
+    @meshbluConfig = @parseMeshbluConfig()
+
+  parseMeshbluConfig: =>
+    options = new MeshbluConfig().toJSON()
+    unless options.uuid && options.token
+      console.error colors.red 'Missing a meshblu.json file in this directory with a uuid and token'
+    return options
 
   parseOptions: =>
     parser = dashdash.createParser({options: OPTIONS})
     options = parser.parse(process.argv)
 
     if options.help
-      console.log "usage: meshblu-forward-to-webhook [OPTIONS]\noptions:\n#{parser.help({includeEnv: true})}"
+      console.log @usage parser.help({includeEnv: true})
       process.exit 0
 
     if options.version
       console.log packageJSON.version
       process.exit 0
 
-    if !options.example
-      console.error "usage: meshblu-forward-to-webhook [OPTIONS]\noptions:\n#{parser.help({includeEnv: true})}"
-      console.error colors.red 'Missing required parameter --example, -e, or env: EXAMPLE'
+    unless options.emitter_uuid
+      console.error @usage parser.help({includeEnv: true})
+      console.error colors.red 'Missing required parameter --emitter-uuid, -e, or env: MESHBLU_EMITTER_UUID'
       process.exit 1
 
-    return options
+    return {
+      emitterUuid: options.emitter_uuid
+    }
 
   run: =>
-    console.log "Hi Example! #{@example}"
+    console.log JSON.stringify @meshbluConfig
+
+  usage: (optionsStr) =>
+    return """
+      usage: meshblu-forward-to-webhook [OPTIONS]
+      options:
+        #{optionsStr}
+    """
 
   die: (error) =>
     return process.exit(0) unless error?
